@@ -1,0 +1,744 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>나만의 영어 단어 시험</title>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 18px;
+    background: #f2f5fa;
+    font-family: Arial, sans-serif;
+    color: #172b4d;
+}
+
+.container {
+    max-width: 600px;
+    margin: auto;
+}
+
+header {
+    background: #172b4d;
+    color: white;
+    padding: 25px;
+    border-radius: 18px;
+    margin-bottom: 18px;
+}
+
+header h1 { margin: 0 0 8px; }
+header p { margin: 0; color: #cbd8ea; }
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 3px 12px #0000000a;
+}
+
+h2 { font-size: 19px; }
+
+button, .upload {
+    display: inline-block;
+    border: none;
+    background: #244a7c;
+    color: white;
+    padding: 13px 17px;
+    border-radius: 10px;
+    font-size: 15px;
+    cursor: pointer;
+    margin: 4px 2px;
+}
+
+.secondary {
+    background: #e8eef7;
+    color: #244a7c;
+}
+
+button:disabled {
+    opacity: .5;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 13px;
+    border: 1px solid #ccd5e2;
+    border-radius: 10px;
+    font-size: 16px;
+    margin: 7px 0;
+}
+
+textarea {
+    min-height: 180px;
+    resize: vertical;
+    line-height: 1.7;
+}
+
+input[type="file"] { display: none; }
+
+.small {
+    color: #78869a;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+#quiz {
+    display: none;
+    text-align: center;
+}
+
+#question {
+    font-size: 30px;
+    font-weight: bold;
+    margin: 35px 0;
+    overflow-wrap: anywhere;
+}
+
+#feedback {
+    min-height: 30px;
+    font-weight: bold;
+    margin: 15px;
+}
+
+.correct { color: #15945b; }
+.incorrect { color: #dc4141; }
+
+.full {
+    width: 100%;
+}
+
+#progress {
+    color: #78869a;
+}
+
+.word-item {
+    padding: 9px 0;
+    border-bottom: 1px solid #eee;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+    <h1>VOCAB TEST</h1>
+    <p>사진으로 만드는 나만의 영어 단어 시험</p>
+</header>
+
+<!-- 사진 업로드 -->
+<div class="card">
+    <h2>📷 1. 단어장 사진 촬영</h2>
+
+    <label class="upload" for="photo">
+        카메라 / 사진 선택
+    </label>
+
+    <input
+        type="file"
+        id="photo"
+        accept="image/*"
+        capture="environment"
+    >
+
+    <button id="recognizeBtn" class="secondary" disabled>
+        사진 글자 인식
+    </button>
+
+    <p class="small" id="status">
+        사진을 선택한 후 글자 인식을 눌러주세요.
+        OCR 사용 시 인터넷 연결이 필요합니다.
+    </p>
+</div>
+
+<!-- 단어 확인 -->
+<div class="card">
+    <h2>📝 2. 단어 확인 및 수정</h2>
+
+    <p class="small">
+        한 줄에 하나씩 작성해 주세요.<br>
+        영어 단어 = 한국어 뜻
+    </p>
+
+    <textarea id="vocabulary"
+placeholder="achieve = 성취하다
+accurate = 정확한
+benefit = 이익
+challenge = 도전"></textarea>
+
+    <button id="saveBtn" class="full">
+        단어장 저장
+    </button>
+
+    <p id="wordCount" class="small">
+        등록된 단어: 0개
+    </p>
+</div>
+
+<!-- 시험 설정 -->
+<div class="card">
+    <h2>🎯 3. 시험 시작</h2>
+
+    <button id="allBtn" class="full">
+        전체 단어 시험
+    </button>
+
+    <button id="wrongBtn" class="secondary full">
+        오답 단어 시험
+    </button>
+</div>
+
+<!-- 퀴즈 -->
+<div class="card" id="quiz">
+
+    <p id="progress">1 / 10</p>
+
+    <p id="direction" class="small">
+        영어 단어의 뜻을 입력하세요.
+    </p>
+
+    <div id="question">achieve</div>
+
+    <input
+        type="text"
+        id="answer"
+        placeholder="정답 입력"
+        autocomplete="off"
+    >
+
+    <button id="submitBtn" class="full">
+        정답 제출
+    </button>
+
+    <p id="feedback"></p>
+
+    <button id="nextBtn" class="secondary full"
+    style="display:none;">
+        다음 문제
+    </button>
+
+</div>
+
+<!-- 결과 -->
+<div class="card">
+    <h2>📊 4. 학습 기록</h2>
+
+    <p id="wrongCount">오답 단어: 0개</p>
+
+    <div id="wrongList" class="small">
+        아직 오답이 없습니다.
+    </div>
+
+    <button id="clearWrongBtn" class="secondary full">
+        오답 기록 초기화
+    </button>
+</div>
+
+</div>
+
+<script>
+
+// ============================
+// 기본 데이터
+// ============================
+
+let words = JSON.parse(
+    localStorage.getItem("myWords") || "[]"
+);
+
+let wrongWords = JSON.parse(
+    localStorage.getItem("myWrong") || "[]"
+);
+
+let quizWords = [];
+let currentIndex = 0;
+let score = 0;
+let expectedAnswers = [];
+let currentWord = null;
+
+const $ = id => document.getElementById(id);
+
+
+// ============================
+// 사진 선택
+// ============================
+
+$("photo").addEventListener("change", function() {
+
+    const file = this.files[0];
+
+    $("recognizeBtn").disabled = !file;
+
+    if(file) {
+        $("status").textContent =
+            "사진 선택 완료: " + file.name;
+    }
+
+});
+
+
+// ============================
+// OCR 글자 인식
+// ============================
+
+$("recognizeBtn").addEventListener("click", async function() {
+
+    const file = $("photo").files[0];
+
+    if(!file) return;
+
+    if(!window.Tesseract) {
+        $("status").textContent =
+            "OCR 프로그램을 불러오지 못했습니다. 인터넷을 확인하세요.";
+        return;
+    }
+
+    this.disabled = true;
+
+    $("status").textContent =
+        "사진을 분석하고 있습니다. 잠시 기다려 주세요.";
+
+    try {
+
+        const result = await Tesseract.recognize(
+            file,
+            "eng+kor",
+            {
+                logger: function(m) {
+                    if(m.status) {
+                        $("status").textContent =
+                            m.status + " " +
+                            Math.round((m.progress || 0) * 100) + "%";
+                    }
+                }
+            }
+        );
+
+        $("vocabulary").value = result.data.text;
+
+        $("status").textContent =
+            "인식 완료! 단어와 뜻을 확인하고 수정해 주세요.";
+
+    }
+
+    catch(error) {
+
+        $("status").textContent =
+            "인식 오류: " + error.message;
+
+    }
+
+    this.disabled = false;
+
+});
+
+
+// ============================
+// 단어장 분석
+// ============================
+
+function parseWords(text) {
+
+    const result = [];
+
+    text.split(/\r?\n/).forEach(line => {
+
+        const match = line.trim().match(
+            /^([A-Za-z][A-Za-z\s'-]*?)\s*(?:=|:|\t)\s*(.+)$/
+        );
+
+        if(match) {
+
+            const english = match[1].trim();
+
+            const meanings = match[2]
+                .split(/[;,/]/)
+                .map(x => x.trim())
+                .filter(Boolean);
+
+            if(english && meanings.length) {
+
+                result.push({
+                    word: english,
+                    meanings: meanings
+                });
+
+            }
+
+        }
+
+    });
+
+    const unique = new Map();
+
+    result.forEach(item => {
+        unique.set(item.word.toLowerCase(), item);
+    });
+
+    return Array.from(unique.values());
+
+}
+
+
+// ============================
+// 단어장 저장
+// ============================
+
+function saveWords() {
+
+    const parsed = parseWords(
+        $("vocabulary").value
+    );
+
+    if(parsed.length === 0) {
+
+        alert(
+            "단어를 찾지 못했습니다.\n" +
+            "achieve = 성취하다 형식으로 입력해 주세요."
+        );
+
+        return false;
+
+    }
+
+    words = parsed;
+
+    localStorage.setItem(
+        "myWords",
+        JSON.stringify(words)
+    );
+
+    updateScreen();
+
+    alert(words.length + "개의 단어를 저장했습니다.");
+
+    return true;
+
+}
+
+$("saveBtn").addEventListener("click", saveWords);
+
+
+// ============================
+// 화면 업데이트
+// ============================
+
+function updateScreen() {
+
+    $("wordCount").textContent =
+        "등록된 단어: " + words.length + "개";
+
+    $("wrongCount").textContent =
+        "오답 단어: " + wrongWords.length + "개";
+
+    if(wrongWords.length === 0) {
+
+        $("wrongList").textContent =
+            "아직 오답이 없습니다.";
+
+    } else {
+
+        $("wrongList").innerHTML =
+            wrongWords.map(item =>
+                `<div class="word-item">
+                <b>${escapeHTML(item.word)}</b> :
+                ${escapeHTML(item.meanings.join(", "))}
+                </div>`
+            ).join("");
+
+    }
+
+}
+
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, c => ({
+        "&":"&amp;",
+        "<":"&lt;",
+        ">":"&gt;",
+        '"':"&quot;",
+        "'":"&#39;"
+    })[c]);
+}
+
+
+// ============================
+// 시험 시작
+// ============================
+
+function startQuiz(list) {
+
+    if(list.length === 0) {
+
+        alert("시험을 볼 단어가 없습니다.");
+
+        return;
+
+    }
+
+    quizWords = [...list].sort(
+        () => Math.random() - 0.5
+    );
+
+    currentIndex = 0;
+    score = 0;
+
+    $("quiz").style.display = "block";
+
+    showQuestion();
+
+    $("quiz").scrollIntoView({
+        behavior: "smooth"
+    });
+
+}
+
+
+// ============================
+// 문제 출제
+// ============================
+
+function showQuestion() {
+
+    if(currentIndex >= quizWords.length) {
+
+        finishQuiz();
+
+        return;
+
+    }
+
+    currentWord = quizWords[currentIndex];
+
+    const reverse = Math.random() < 0.5;
+
+    if(reverse) {
+
+        $("question").textContent =
+            currentWord.word;
+
+        $("direction").textContent =
+            "한국어 뜻을 입력하세요.";
+
+        expectedAnswers = currentWord.meanings;
+
+    } else {
+
+        const meaning = currentWord.meanings[
+            Math.floor(
+                Math.random() * currentWord.meanings.length
+            )
+        ];
+
+        $("question").textContent = meaning;
+
+        $("direction").textContent =
+            "영어 단어를 입력하세요.";
+
+        expectedAnswers = [currentWord.word];
+
+    }
+
+    $("progress").textContent =
+        (currentIndex + 1) + " / " + quizWords.length;
+
+    $("answer").value = "";
+    $("answer").disabled = false;
+
+    $("feedback").textContent = "";
+    $("feedback").className = "";
+
+    $("submitBtn").style.display = "block";
+    $("nextBtn").style.display = "none";
+
+    $("answer").focus();
+
+}
+
+
+// ============================
+// 정답 확인
+// ============================
+
+function checkAnswer() {
+
+    const answer = $("answer").value.trim().toLowerCase();
+
+    if(!answer) {
+
+        alert("정답을 입력해 주세요.");
+
+        return;
+
+    }
+
+    const correct = expectedAnswers.some(
+        x => x.toLowerCase() === answer
+    );
+
+    if(correct) {
+
+        score++;
+
+        $("feedback").textContent =
+            "정답입니다! 🎉";
+
+        $("feedback").className = "correct";
+
+    } else {
+
+        $("feedback").textContent =
+            "오답입니다. 정답: " +
+            expectedAnswers.join(", ");
+
+        $("feedback").className = "incorrect";
+
+        const exists = wrongWords.some(
+            x => x.word.toLowerCase() ===
+            currentWord.word.toLowerCase()
+        );
+
+        if(!exists) {
+
+            wrongWords.push(currentWord);
+
+        }
+
+        localStorage.setItem(
+            "myWrong",
+            JSON.stringify(wrongWords)
+        );
+
+        updateScreen();
+
+    }
+
+    $("answer").disabled = true;
+    $("submitBtn").style.display = "none";
+    $("nextBtn").style.display = "block";
+
+}
+
+$("submitBtn").addEventListener(
+    "click",
+    checkAnswer
+);
+
+$("answer").addEventListener("keydown", function(e) {
+
+    if(e.key === "Enter" && !this.disabled) {
+        checkAnswer();
+    }
+
+});
+
+
+// ============================
+// 다음 문제
+// ============================
+
+$("nextBtn").addEventListener("click", function() {
+
+    currentIndex++;
+
+    showQuestion();
+
+});
+
+
+// ============================
+// 시험 결과
+// ============================
+
+function finishQuiz() {
+
+    $("direction").textContent =
+        "시험이 종료되었습니다!";
+
+    $("question").textContent =
+        score + " / " + quizWords.length;
+
+    $("progress").textContent =
+        "시험 완료";
+
+    $("answer").style.display = "none";
+    $("submitBtn").style.display = "none";
+    $("nextBtn").style.display = "none";
+
+    $("feedback").textContent =
+        "정답률: " +
+        Math.round(score / quizWords.length * 100) +
+        "%";
+
+    $("feedback").className = "correct";
+
+}
+
+
+// ============================
+// 전체 시험 / 오답 시험
+// ============================
+
+$("allBtn").addEventListener("click", function() {
+
+    if(words.length === 0) {
+
+        alert("먼저 단어장을 저장해 주세요.");
+
+        return;
+
+    }
+
+    startQuiz(words);
+
+});
+
+$("wrongBtn").addEventListener("click", function() {
+
+    startQuiz(wrongWords);
+
+});
+
+
+// ============================
+// 오답 초기화
+// ============================
+
+$("clearWrongBtn").addEventListener("click", function() {
+
+    if(confirm("오답 기록을 모두 삭제할까요?")) {
+
+        wrongWords = [];
+
+        localStorage.removeItem("myWrong");
+
+        updateScreen();
+
+    }
+
+});
+
+
+// ============================
+// 처음 실행 시 데이터 복원
+// ============================
+
+if(words.length > 0) {
+
+    $("vocabulary").value = words.map(
+        x => x.word + " = " + x.meanings.join("/")
+    ).join("\n");
+
+}
+
+updateScreen();
+
+</script>
+</body>
+</html>
